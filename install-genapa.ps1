@@ -22,11 +22,25 @@ param(
     [switch]$Force,
     [switch]$PreRelease,
     [switch]$DownloadOnly,
-    [string]$GitHubRepo = 'iamkelatar/genapa-releases'
+    [string]$GitHubRepo = 'iamkelatar/genapa-releases',
+    [string]$GitHubToken
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# Resolve GitHub auth token: explicit param > GH_TOKEN > GITHUB_TOKEN
+if ([string]::IsNullOrWhiteSpace($GitHubToken)) {
+    $GitHubToken = if ($env:GH_TOKEN) { $env:GH_TOKEN } elseif ($env:GITHUB_TOKEN) { $env:GITHUB_TOKEN } else { '' }
+}
+
+$script:AuthHeaders = @{}
+if (-not [string]::IsNullOrWhiteSpace($GitHubToken)) {
+    $script:AuthHeaders = @{
+        Authorization = "Bearer $GitHubToken"
+        Accept        = 'application/vnd.github+json'
+    }
+}
 
 # region --- Output helpers ---
 
@@ -115,7 +129,7 @@ function Resolve-LatestRelease {
     if (-not $IncludePreRelease) {
         $url = "https://api.github.com/repos/$Repo/releases/latest"
         try {
-            return Invoke-RestMethod -Uri $url -TimeoutSec 30 -ErrorAction Stop
+            return Invoke-RestMethod -Uri $url -Headers $script:AuthHeaders -TimeoutSec 30 -ErrorAction Stop
         }
         catch {
             Write-Fail "Failed to query latest release from $url"
@@ -129,7 +143,7 @@ function Resolve-LatestRelease {
 
     $url = "https://api.github.com/repos/$Repo/releases?per_page=20"
     try {
-        $releases = Invoke-RestMethod -Uri $url -TimeoutSec 30 -ErrorAction Stop
+        $releases = Invoke-RestMethod -Uri $url -Headers $script:AuthHeaders -TimeoutSec 30 -ErrorAction Stop
     }
     catch {
         Write-Fail "Failed to query releases from $url"
@@ -153,7 +167,7 @@ function Resolve-TaggedRelease {
 
     $url = "https://api.github.com/repos/$Repo/releases/tags/$Tag"
     try {
-        return Invoke-RestMethod -Uri $url -TimeoutSec 30 -ErrorAction Stop
+        return Invoke-RestMethod -Uri $url -Headers $script:AuthHeaders -TimeoutSec 30 -ErrorAction Stop
     }
     catch {
         Write-Fail "Release '$Tag' not found in $Repo."
@@ -194,7 +208,11 @@ function Invoke-FileDownload {
     try {
         # Invoke-WebRequest progress rendering is extremely slow; disable it for downloads
         $global:ProgressPreference = 'SilentlyContinue'
-        Invoke-WebRequest -Uri $Url -OutFile $Destination -TimeoutSec 300 -ErrorAction Stop
+        $downloadHeaders = @{}
+        if ($script:AuthHeaders.Count -gt 0) {
+            $downloadHeaders = @{ Authorization = $script:AuthHeaders['Authorization']; Accept = 'application/octet-stream' }
+        }
+        Invoke-WebRequest -Uri $Url -Headers $downloadHeaders -OutFile $Destination -TimeoutSec 300 -ErrorAction Stop
     }
     finally {
         $global:ProgressPreference = $ProgressPreference_Saved

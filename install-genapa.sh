@@ -6,6 +6,7 @@ VERSION=""
 SLUG="prod"
 GITHUB_REPO="iamkelatar/genapa-releases"
 DOWNLOAD_ONLY=false
+GITHUB_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -13,9 +14,15 @@ while [[ $# -gt 0 ]]; do
     --slug|-s) SLUG="$2"; shift 2 ;;
     --download-only) DOWNLOAD_ONLY=true; shift ;;
     --repo) GITHUB_REPO="$2"; shift 2 ;;
+    --token) GITHUB_TOKEN="$2"; shift 2 ;;
     *) shift ;;
   esac
 done
+
+AUTH_HEADER=""
+if [[ -n "$GITHUB_TOKEN" ]]; then
+  AUTH_HEADER="Authorization: Bearer $GITHUB_TOKEN"
+fi
 
 case "$(uname -s)" in
   Linux*)  OS="linux"; EXT="tar.gz" ;;
@@ -62,7 +69,12 @@ else
   RELEASE_URL="https://api.github.com/repos/$GITHUB_REPO/releases/tags/$VERSION"
 fi
 
-RELEASE_JSON=$(curl -fsSL "$RELEASE_URL") || {
+CURL_AUTH=()
+if [[ -n "$AUTH_HEADER" ]]; then
+  CURL_AUTH=(-H "$AUTH_HEADER")
+fi
+
+RELEASE_JSON=$(curl -fsSL "${CURL_AUTH[@]}" "$RELEASE_URL") || {
   echo "  [X] Failed to query release from ${RELEASE_URL}" >&2
   exit 1
 }
@@ -89,12 +101,12 @@ TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 echo "  [*] Downloading ${BUNDLE_NAME}..."
-curl -fSL -o "$TMP_DIR/$BUNDLE_NAME" "$BUNDLE_URL"
+curl -fSL "${CURL_AUTH[@]}" -o "$TMP_DIR/$BUNDLE_NAME" "$BUNDLE_URL"
 echo "      Saved to ${TMP_DIR}/${BUNDLE_NAME}"
 
 if [[ -n "$SHA_URL" ]]; then
   echo "  [*] Verifying SHA256 checksum..."
-  curl -fsSL -o "$TMP_DIR/$SHA_NAME" "$SHA_URL"
+  curl -fsSL "${CURL_AUTH[@]}" -o "$TMP_DIR/$SHA_NAME" "$SHA_URL"
   EXPECTED_HASH=$(grep -oE '[0-9a-fA-F]{64}' "$TMP_DIR/$SHA_NAME" | head -1 | tr '[:upper:]' '[:lower:]')
   if command -v sha256sum >/dev/null 2>&1; then
     ACTUAL_HASH=$(sha256sum "$TMP_DIR/$BUNDLE_NAME" | cut -d' ' -f1 | tr '[:upper:]' '[:lower:]')
