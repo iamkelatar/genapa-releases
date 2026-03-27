@@ -2,11 +2,11 @@
 
 <#
 .SYNOPSIS
-    GENAPA Forge bootstrapper. Downloads and runs the customer installer from GitHub Releases.
+    GENAPA Forge bootstrapper. Downloads and runs the platform-specific installer from GitHub Releases.
 .DESCRIPTION
-    Single-script entry point for installing GENAPA Forge. Resolves the latest (or a pinned)
-    release from the GitHub Releases API, downloads the customer installer bundle, verifies its
-    SHA256 checksum, extracts it, and delegates to Install-GenapaCustomer.ps1.
+    Single-script entry point for installing GENAPA Forge. Detects the current OS, resolves the
+    latest (or a pinned) release from the GitHub Releases API, downloads the correct platform
+    bundle, verifies its SHA256 checksum, extracts it, and delegates to the root installer.
 
     Supports both piped execution (irm | iex) with defaults and direct file execution with parameters.
 .EXAMPLE
@@ -54,15 +54,6 @@ function Write-Fail([string]$Message) {
 
 # region --- Prerequisite checks ---
 
-function Assert-WindowsPlatform {
-    if (-not $IsWindows) {
-        Write-Fail 'GENAPA Forge requires Windows. The bundled Host Manager and LINK payloads are Windows executables.'
-        Write-Host ''
-        Write-Host '      Linux and macOS support is planned for a future release.' -ForegroundColor Yellow
-        exit 1
-    }
-}
-
 function Assert-PowerShellVersion {
     if ($PSVersionTable.PSVersion.Major -lt 7) {
         Write-Fail "PowerShell 7+ is required. Current version: $($PSVersionTable.PSVersion)"
@@ -77,7 +68,13 @@ function Assert-DockerRunning {
     if (-not $dockerCmd) {
         Write-Fail 'Docker is not installed or not on PATH.'
         Write-Host ''
-        Write-Host '      Install Docker Desktop:  https://docs.docker.com/desktop/setup/install/windows-install/' -ForegroundColor Yellow
+        if ($IsLinux) {
+            Write-Host '      Install Docker Engine:  https://docs.docker.com/engine/install/' -ForegroundColor Yellow
+        } elseif ($IsMacOS) {
+            Write-Host '      Install Docker Desktop:  https://docs.docker.com/desktop/setup/install/mac-install/' -ForegroundColor Yellow
+        } else {
+            Write-Host '      Install Docker Desktop:  https://docs.docker.com/desktop/setup/install/windows-install/' -ForegroundColor Yellow
+        }
         exit 1
     }
 
@@ -257,12 +254,20 @@ function Test-Sha256Checksum {
 
 Write-Banner
 
-Assert-WindowsPlatform
 Assert-PowerShellVersion
 Assert-DockerRunning
 Assert-NetworkConnectivity
 
 Write-Step 'Prerequisites OK.'
+
+$detectedOs = if ($IsWindows) { 'windows' }
+              elseif ($IsLinux) { 'linux' }
+              elseif ($IsMacOS) { 'macos' }
+              else { throw 'Unsupported OS.' }
+
+$bundleExt = if ($detectedOs -eq 'windows') { 'zip' } else { 'tar.gz' }
+
+Write-Info "Detected platform: $detectedOs"
 
 # Resolve the target release
 if ([string]::IsNullOrWhiteSpace($Version)) {
@@ -278,34 +283,46 @@ $resolvedTag = $release.tag_name
 $resolvedVersion = $resolvedTag -replace '^v', ''
 Write-Info "Release: $resolvedTag ($($release.name))"
 
-# Locate the installer ZIP asset
-$zipPattern = "genapa-customer-installer-*.zip"
-$zipUrl = Get-ReleaseAssetUrl -Release $release -Pattern $zipPattern
-if (-not $zipUrl) {
-    Write-Fail "No customer installer ZIP asset matching '$zipPattern' found in release $resolvedTag."
-    Write-Host ''
-    Write-Host "      Check the release assets at: https://github.com/$GitHubRepo/releases/tag/$resolvedTag" -ForegroundColor Yellow
-    exit 1
+# Locate the platform bundle asset (new format), with fallback to legacy format
+$bundlePattern = "genapa-forge-*-$detectedOs.$bundleExt"
+$bundleUrl = Get-ReleaseAssetUrl -Release $release -Pattern $bundlePattern
+$checksumPattern = "genapa-forge-*-$detectedOs.sha256"
+$useLegacyFormat = $false
+
+if (-not $bundleUrl) {
+    # Backward compat: try old single-ZIP format for older releases
+    $bundlePattern = "genapa-customer-installer-*.zip"
+    $bundleUrl = Get-ReleaseAssetUrl -Release $release -Pattern $bundlePattern
+    $checksumPattern = "genapa-customer-installer-*.sha256"
+    $useLegacyFormat = $true
+
+    if (-not $bundleUrl) {
+        Write-Fail "No bundle asset found for platform '$detectedOs' in release $resolvedTag."
+        Write-Host ''
+        Write-Host "      Check the release assets at: https://github.com/$GitHubRepo/releases/tag/$resolvedTag" -ForegroundColor Yellow
+        exit 1
+    }
+
+    Write-Host '      Using legacy release format (pre-platform bundles).' -ForegroundColor Yellow
 }
 
-$zipAssetName = ($release.assets | Where-Object { $_.name -like $zipPattern } | Select-Object -First 1).name
+$zipAssetName = ($release.assets | Where-Object { $_.name -like $bundlePattern } | Select-Object -First 1).name
 
-# Locate the checksum asset
-$checksumPattern = "genapa-customer-installer-*.sha256"
 $checksumUrl = Get-ReleaseAssetUrl -Release $release -Pattern $checksumPattern
 
 # Prepare temp download directory
-$downloadDir = Join-Path $env:TEMP "genapa-install-$resolvedVersion"
+$tempBase = if ($env:TEMP) { $env:TEMP } elseif ($env:TMPDIR) { $env:TMPDIR } else { '/tmp' }
+$downloadDir = Join-Path $tempBase "genapa-install-$resolvedVersion"
 if (-not (Test-Path $downloadDir)) {
     New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
 }
 
-$zipPath = Join-Path $downloadDir $zipAssetName
+$bundlePath = Join-Path $downloadDir $zipAssetName
 
-# Download the installer ZIP
+# Download the bundle
 Write-Step "Downloading $zipAssetName..."
-Invoke-FileDownload -Url $zipUrl -Destination $zipPath
-Write-Info "Saved to $zipPath"
+Invoke-FileDownload -Url $bundleUrl -Destination $bundlePath
+Write-Info "Saved to $bundlePath"
 
 # Download and verify checksum
 if ($checksumUrl) {
@@ -315,7 +332,7 @@ if ($checksumUrl) {
     Write-Step 'Verifying SHA256 checksum...'
     Invoke-FileDownload -Url $checksumUrl -Destination $checksumPath
 
-    if (-not (Test-Sha256Checksum -FilePath $zipPath -ChecksumFilePath $checksumPath)) {
+    if (-not (Test-Sha256Checksum -FilePath $bundlePath -ChecksumFilePath $checksumPath)) {
         exit 1
     }
     Write-Info 'Checksum verified.'
@@ -331,27 +348,39 @@ if (Test-Path $extractDir) {
 }
 
 Write-Step 'Extracting installer bundle...'
-Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
+if ($bundlePath -match '\.tar\.gz$') {
+    New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
+    tar -xzf $bundlePath -C $extractDir
+} else {
+    Expand-Archive -Path $bundlePath -DestinationPath $extractDir -Force
+}
 
-# Locate Install-GenapaCustomer.ps1 in the extracted contents
-$customerInstaller = Get-ChildItem -Path $extractDir -Filter 'Install-GenapaCustomer.ps1' -Recurse | Select-Object -First 1
-if (-not $customerInstaller) {
-    Write-Fail 'Install-GenapaCustomer.ps1 not found inside the extracted bundle.'
+# Locate the root installer in the extracted bundle
+if ($useLegacyFormat) {
+    $installer = Get-ChildItem -Path $extractDir -Filter 'Install-GenapaCustomer.ps1' -Recurse | Select-Object -First 1
+} elseif ($detectedOs -eq 'windows') {
+    $installer = Get-ChildItem -Path $extractDir -Filter 'Install-GenapaForge.ps1' -Recurse | Select-Object -First 1
+} else {
+    $installer = Get-ChildItem -Path $extractDir -Filter 'install-genapa-forge.sh' -Recurse | Select-Object -First 1
+}
+
+if (-not $installer) {
+    Write-Fail 'Root installer not found inside the extracted bundle.'
     Write-Host ''
     Write-Host "      The extracted contents are at: $extractDir" -ForegroundColor Yellow
     exit 1
 }
 
-Write-Info "Found installer at $($customerInstaller.FullName)"
+Write-Info "Found installer at $($installer.FullName)"
 
 if ($DownloadOnly) {
     Write-Step 'Download-only mode. Skipping installer execution.'
     Write-Info "Bundle extracted to: $extractDir"
-    Write-Info "Run manually:  pwsh -File `"$($customerInstaller.FullName)`" -Slug $Slug"
+    Write-Info "Run manually:  pwsh -File `"$($installer.FullName)`" -Slug $Slug"
     exit 0
 }
 
-# Build arguments for the customer installer
+# Build arguments for the installer
 $installerArgs = @(
     '-Slug', $Slug
 )
@@ -364,10 +393,19 @@ if (-not [string]::IsNullOrWhiteSpace($InstallRoot)) {
     $installerArgs += @('-InstallRoot', $InstallRoot)
 }
 
-Write-Step 'Launching customer installer...'
+Write-Step 'Launching installer...'
 Write-Host ''
 
-& $customerInstaller.FullName @installerArgs
+if ($installer.Name -match '\.sh$') {
+    if (-not (Get-Command bash -ErrorAction SilentlyContinue)) {
+        Write-Fail 'bash is required to run the installer on this platform.'
+        exit 1
+    }
+    chmod +x $installer.FullName 2>$null
+    & bash $installer.FullName --slug $Slug
+} else {
+    & $installer.FullName @installerArgs
+}
 $installerExitCode = $LASTEXITCODE
 
 # Cleanup on success
