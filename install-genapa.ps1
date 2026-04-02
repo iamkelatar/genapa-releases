@@ -29,9 +29,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# Resolve GitHub auth token: explicit param > GH_TOKEN > GITHUB_TOKEN
+# Resolve GitHub auth token: explicit param > GH_TOKEN
+# Note: GITHUB_TOKEN is intentionally not used — CI runners often set it to a scoped token
+# that causes 401 errors against other repositories.
 if ([string]::IsNullOrWhiteSpace($GitHubToken)) {
-    $GitHubToken = if ($env:GH_TOKEN) { $env:GH_TOKEN } elseif ($env:GITHUB_TOKEN) { $env:GITHUB_TOKEN } else { '' }
+    $GitHubToken = if ($env:GH_TOKEN) { $env:GH_TOKEN } else { '' }
 }
 
 $script:AuthHeaders = @{}
@@ -132,12 +134,8 @@ function Resolve-LatestRelease {
             return Invoke-RestMethod -Uri $url -Headers $script:AuthHeaders -TimeoutSec 30 -ErrorAction Stop
         }
         catch {
-            Write-Fail "Failed to query latest release from $url"
-            Write-Host "      $($_.Exception.Message)" -ForegroundColor Yellow
-            Write-Host ''
-            Write-Host '      If you are behind a corporate proxy or hitting GitHub API rate limits,' -ForegroundColor Yellow
-            Write-Host '      re-run with -Version <tag> to skip the API call.' -ForegroundColor Yellow
-            exit 1
+            # /releases/latest returns 404 when only pre-releases exist; fall through to list query
+            Write-Info 'No stable release found, checking pre-releases...'
         }
     }
 
@@ -148,12 +146,21 @@ function Resolve-LatestRelease {
     catch {
         Write-Fail "Failed to query releases from $url"
         Write-Host "      $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host ''
+        Write-Host '      If you are behind a corporate proxy or hitting GitHub API rate limits,' -ForegroundColor Yellow
+        Write-Host '      re-run with -Version <tag> to skip the API call.' -ForegroundColor Yellow
         exit 1
     }
 
     if ($releases.Count -eq 0) {
         Write-Fail "No releases found in $Repo."
         exit 1
+    }
+
+    if (-not $IncludePreRelease) {
+        $stable = $releases | Where-Object { -not $_.prerelease } | Select-Object -First 1
+        if ($stable) { return $stable }
+        Write-Info 'No stable release available, using latest pre-release.'
     }
 
     return $releases[0]
