@@ -71,12 +71,66 @@ function Write-Fail([string]$Message) {
 # region --- Prerequisite checks ---
 
 function Assert-PowerShellVersion {
-    if ($PSVersionTable.PSVersion.Major -lt 7) {
-        Write-Fail "PowerShell 7+ is required. Current version: $($PSVersionTable.PSVersion)"
-        Write-Host ''
-        Write-Host '      Install PowerShell 7:  https://aka.ms/install-powershell' -ForegroundColor Yellow
+    if ($PSVersionTable.PSVersion.Major -ge 7) { return }
+
+    Write-Info "PowerShell 7+ is required. Current version: $($PSVersionTable.PSVersion)"
+    Write-Step 'Installing PowerShell 7...'
+
+    try {
+        $ProgressPreference_Saved = $ProgressPreference
+        $global:ProgressPreference = 'SilentlyContinue'
+
+        $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/PowerShell/PowerShell/releases/latest' -TimeoutSec 30 -ErrorAction Stop
+        $msiAsset = $release.assets | Where-Object { $_.name -match 'PowerShell-.*-win-x64\.msi$' } | Select-Object -First 1
+
+        if (-not $msiAsset) {
+            Write-Fail 'Could not find PowerShell 7 MSI installer from GitHub.'
+            exit 1
+        }
+
+        $msiPath = Join-Path $env:TEMP $msiAsset.name
+        Write-Info "Downloading $($msiAsset.name)..."
+        Invoke-WebRequest -Uri $msiAsset.browser_download_url -OutFile $msiPath -TimeoutSec 300 -ErrorAction Stop
+
+        Write-Info 'Running installer...'
+        $msiProcess = Start-Process msiexec.exe -ArgumentList '/i', $msiPath, '/quiet', '/norestart' -Wait -PassThru -NoNewWindow
+        if ($msiProcess.ExitCode -ne 0) {
+            # Try per-user install if system-wide fails (no admin)
+            Write-Info 'System install requires elevation, trying per-user install...'
+            $msiProcess = Start-Process msiexec.exe -ArgumentList '/i', $msiPath, '/quiet', '/norestart', 'PER_USER=1', 'REGISTER_MANIFEST=0' -Wait -PassThru -NoNewWindow
+            if ($msiProcess.ExitCode -ne 0) {
+                Write-Fail "PowerShell 7 installation failed (exit code $($msiProcess.ExitCode))."
+                Write-Host '      Install manually: https://aka.ms/install-powershell' -ForegroundColor Yellow
+                exit 1
+            }
+        }
+
+        $global:ProgressPreference = $ProgressPreference_Saved
+    }
+    catch {
+        Write-Fail "Failed to install PowerShell 7: $($_.Exception.Message)"
+        Write-Host '      Install manually: https://aka.ms/install-powershell' -ForegroundColor Yellow
         exit 1
     }
+
+    # Find pwsh and re-launch this script under PowerShell 7
+    $pwshPath = (Get-Command pwsh -ErrorAction SilentlyContinue).Source
+    if (-not $pwshPath) {
+        $pwshPath = "$env:ProgramFiles\PowerShell\7\pwsh.exe"
+    }
+
+    if (-not (Test-Path $pwshPath)) {
+        Write-Fail 'PowerShell 7 was installed but pwsh.exe was not found on PATH.'
+        Write-Host "      Try running: & `"$env:ProgramFiles\PowerShell\7\pwsh.exe`"" -ForegroundColor Yellow
+        exit 1
+    }
+
+    Write-Step 'PowerShell 7 installed. Re-launching installer under pwsh...'
+    Write-Host ''
+
+    # Re-download and execute under pwsh since we may be running via irm|iex
+    & $pwshPath -NoProfile -Command "irm https://raw.githubusercontent.com/iamkelatar/genapa-releases/main/install-genapa.ps1 | iex"
+    exit $LASTEXITCODE
 }
 
 function Assert-DockerRunning {
