@@ -280,21 +280,12 @@ function Test-Sha256Checksum {
 Write-Banner
 
 if ([string]::IsNullOrWhiteSpace($Slug)) {
-    Write-Host '  Select environment:' -ForegroundColor Cyan
-    Write-Host '    1) prod' -ForegroundColor White
-    Write-Host '    2) test' -ForegroundColor White
-    Write-Host ''
-    $choice = Read-Host '  Enter choice (1 or 2)'
-    $Slug = switch ($choice) {
-        '1' { 'prod' }
-        '2' { 'test' }
-        'prod' { 'prod' }
-        'test' { 'test' }
-        default {
-            Write-Fail "Invalid selection '$choice'. Use 1 (prod) or 2 (test)."
-            exit 1
-        }
+    $Slug = Read-Host '  Enter environment slug (e.g. prod, test)'
+    if ([string]::IsNullOrWhiteSpace($Slug)) {
+        Write-Fail 'No slug provided.'
+        exit 1
     }
+    $Slug = $Slug.Trim()
     Write-Host ''
 }
 
