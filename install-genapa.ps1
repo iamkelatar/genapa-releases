@@ -10,9 +10,10 @@
 
     Supports both piped execution (irm | iex) with defaults and direct file execution with parameters.
 .EXAMPLE
-    irm https://raw.githubusercontent.com/iamkelatar/genapa-releases/main/install-genapa.ps1 | iex
+    $env:GH_TOKEN = "<your-github-token>"
+    & ([scriptblock]::Create((irm "https://api.github.com/repos/iamkelatar/genapa-releases/contents/install-genapa.ps1" -Headers @{Authorization="Bearer $env:GH_TOKEN";Accept="application/vnd.github.v3.raw"})))
 .EXAMPLE
-    .\install-genapa.ps1 -Version v1.2.0 -Slug test
+    .\install-genapa.ps1 -Version v1.2.0 -Slug test -GitHubToken $myToken
 #>
 
 param(
