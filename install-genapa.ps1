@@ -406,16 +406,16 @@ if ($DownloadOnly) {
 }
 
 # Build arguments for the installer
-$installerArgs = @(
-    '-Slug', $Slug
-)
+$installerArgs = @{
+    Slug = $Slug
+}
 
 if ($Force) {
-    $installerArgs += '-Force'
+    $installerArgs['Force'] = $true
 }
 
 if (-not [string]::IsNullOrWhiteSpace($InstallRoot)) {
-    $installerArgs += @('-InstallRoot', $InstallRoot)
+    $installerArgs['InstallRoot'] = $InstallRoot
 }
 
 Write-Step 'Launching installer...'
