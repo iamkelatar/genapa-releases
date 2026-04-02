@@ -17,7 +17,7 @@
 
 param(
     [string]$Version,
-    [string]$Slug = 'prod',
+    [string]$Slug,
     [string]$InstallRoot,
     [switch]$Force,
     [switch]$PreRelease,
@@ -278,6 +278,25 @@ function Test-Sha256Checksum {
 # region --- Main ---
 
 Write-Banner
+
+if ([string]::IsNullOrWhiteSpace($Slug)) {
+    Write-Host '  Select environment:' -ForegroundColor Cyan
+    Write-Host '    1) prod' -ForegroundColor White
+    Write-Host '    2) test' -ForegroundColor White
+    Write-Host ''
+    $choice = Read-Host '  Enter choice (1 or 2)'
+    $Slug = switch ($choice) {
+        '1' { 'prod' }
+        '2' { 'test' }
+        'prod' { 'prod' }
+        'test' { 'test' }
+        default {
+            Write-Fail "Invalid selection '$choice'. Use 1 (prod) or 2 (test)."
+            exit 1
+        }
+    }
+    Write-Host ''
+}
 
 Assert-PowerShellVersion
 Assert-DockerRunning
