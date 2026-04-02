@@ -1,15 +1,12 @@
-# GENAPA Forge Releases
-
-This repository hosts customer installer packages for GENAPA Forge.
+# GENAPA Forge
 
 ## Prerequisites
 
-- **PowerShell 7+** (Windows, Linux, or macOS) — [Install PowerShell](https://aka.ms/install-powershell)
-- **Docker** (Docker Desktop on Windows/macOS, Docker Engine on Linux)
+- **Docker** — [Docker Desktop](https://docs.docker.com/desktop/) (Windows/macOS) or [Docker Engine](https://docs.docker.com/engine/install/) (Linux)
 
 ## Quick Install
 
-### Windows (PowerShell 7+)
+### Windows
 
 ```powershell
 irm https://raw.githubusercontent.com/iamkelatar/genapa-releases/main/install-genapa.ps1 | iex
@@ -21,33 +18,43 @@ irm https://raw.githubusercontent.com/iamkelatar/genapa-releases/main/install-ge
 curl -fsSL https://raw.githubusercontent.com/iamkelatar/genapa-releases/main/install-genapa.sh | bash
 ```
 
-## Manual Install
+## Native Installers
 
-1. Download the bundle for your OS from the [latest release](../../releases/latest)
-2. Extract and run the root installer:
+Download the installer for your platform from the [latest release](https://github.com/iamkelatar/genapa-releases/releases/latest):
 
-| OS | Bundle | Installer |
-|----|--------|-----------|
-| Windows | `genapa-forge-<version>-windows.zip` | `Install-GenapaForge.ps1` |
-| Linux | `genapa-forge-<version>-linux.tar.gz` | `install-genapa-forge.sh` |
-| macOS | `genapa-forge-<version>-macos.tar.gz` | `install-genapa-forge.sh` |
+| Platform | Installer | Install Command |
+|----------|-----------|-----------------|
+| Windows  | `genapa-forge-<version>.msi` | Double-click or `msiexec /i genapa-forge-<version>.msi` |
+| Debian/Ubuntu | `genapa-forge_<version>_amd64.deb` | `sudo dpkg -i genapa-forge_<version>_amd64.deb` |
+| RHEL/Fedora | `genapa-forge-<version>.x86_64.rpm` | `sudo rpm -i genapa-forge-<version>.x86_64.rpm` |
+| macOS | `genapa-forge-<version>.pkg` | Double-click or `sudo installer -pkg genapa-forge-<version>.pkg -target /` |
 
-## Options
+Native installers register with your OS package manager (Add/Remove Programs, dpkg, rpm, pkgutil) and handle the full setup automatically.
 
-The bootstrap script accepts parameters when run as a file:
+## Manual Install (Bundle)
 
-```powershell
-.\install-genapa.ps1 -Version v1.2.0 -Slug test
-```
+If you prefer the bundle approach, download the archive for your platform:
+
+| Platform | Bundle | Entry Point |
+|----------|--------|-------------|
+| Windows  | `genapa-forge-<version>-windows.zip` | `Install-GenapaForge.ps1` |
+| Linux    | `genapa-forge-<version>-linux.tar.gz` | `install-genapa-forge.sh` |
+| macOS    | `genapa-forge-<version>-macos.tar.gz` | `install-genapa-forge.sh` |
+
+## Bootstrap Script Options
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `-Version` | latest | Pin to a specific release tag |
-| `-Slug` | `prod` | Environment slug (`prod` or `test`) |
-| `-DownloadOnly` | off | Download and extract without running the installer |
-| `-Force` | off | Overwrite existing installation |
-| `-PreRelease` | off | Include pre-release versions |
+| `-Version` / `--version` | latest | Target a specific release version |
+| `-Slug` / `--slug` | prod | Environment name (e.g., prod, test) |
+| `-DownloadOnly` / `--download-only` | false | Download without installing |
+| `-Force` / `--force` | false | Overwrite existing installation |
+| `-PreRelease` / `--pre-release` | false | Include pre-release versions |
+
+## Offline Install
+
+All installers and bundles include bundled Docker images for fully offline installation. Download the installer on an internet-connected machine and transfer it to the target system. The only prerequisite is Docker.
 
 ## Support
 
-Contact your GENAPA administrator for assistance.
+Contact your organization's GENAPA administrator for assistance.
