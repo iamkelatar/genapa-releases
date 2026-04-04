@@ -9,13 +9,13 @@
 ### Windows
 
 ```powershell
-irm https://raw.githubusercontent.com/iamkelatar/genapa-releases/main/install-genapa.ps1 | iex
+irm https://raw.githubusercontent.com/iamkelatar/genapa-releases/main/Install-GenapaRelease.ps1 | iex
 ```
 
 ### Linux / macOS
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/iamkelatar/genapa-releases/main/install-genapa.sh | bash
+curl -fsSL https://raw.githubusercontent.com/iamkelatar/genapa-releases/main/install-genapa-release.sh | bash
 ```
 
 ## Native Installers
@@ -37,9 +37,9 @@ If you prefer the bundle approach, download the archive for your platform:
 
 | Platform | Bundle | Entry Point |
 |----------|--------|-------------|
-| Windows  | `genapa-forge-<version>-windows.zip` | `Install-GenapaForge.ps1` |
-| Linux    | `genapa-forge-<version>-linux.tar.gz` | `install-genapa-forge.sh` |
-| macOS    | `genapa-forge-<version>-macos.tar.gz` | `install-genapa-forge.sh` |
+| Windows  | `genapa-forge-<version>-windows.zip` | `Install-GenapaBundle.ps1` |
+| Linux    | `genapa-forge-<version>-linux.tar.gz` | `install-genapa-bundle.sh` |
+| macOS    | `genapa-forge-<version>-macos.tar.gz` | `install-genapa-bundle.sh` |
 
 ## Bootstrap Script Options
 
