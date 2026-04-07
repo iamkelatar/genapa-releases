@@ -6,7 +6,7 @@
 
 ## Installer Downloads
 
-Download the installer for your platform from the [latest release](https://github.com/iamkelatar/genapa-releases/releases/latest). Each download is the complete GENAPA install package for that OS and can be run through the OS GUI or CLI.
+Download the native installer for your platform from the [latest release](https://github.com/iamkelatar/genapa-releases/releases/latest). Each installer is the complete GENAPA package for that OS and can be run through the OS GUI or CLI.
 
 | Platform | Installer | Install Command |
 |----------|-----------|-----------------|
@@ -18,6 +18,8 @@ Download the installer for your platform from the [latest release](https://githu
 ## Notes
 
 - Each installer already contains the GENAPA payload. Installation does not require downloading additional GENAPA release assets.
+- Use the native installer surface for install and upgrade.
+- Offline Docker image tar assets remain available in each release for manual recovery and air-gapped staging.
 - Linux uses one installer contract under the OS package manager. Choose the `.deb` package for Debian/Ubuntu or the `.rpm` package for RHEL/Fedora-family systems.
 - Linux GUI install depends on your distro desktop. If no package UI is available, use the CLI command shown above.
 - macOS installs through Installer or `installer -pkg`. `pkgutil` tracks the package receipt, but service and data cleanup remain separate from receipt removal.
