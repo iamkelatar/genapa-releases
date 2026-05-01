@@ -1,28 +1,58 @@
-# GENAPA Forge
+# GENAPA
 
-## Prerequisites
+**GENAPA** — *generally applicable platform assistance* — is a local-first AI knowledge archive. It ingests your files (code, docs, PDFs, notes, configs) and builds a navigable graph of **Sources, References, Entities, and Synths** that you query with natural language. Your data, embeddings, and any AI calls run on your own machine; bring your own LLM / embedding provider, or run fully offline with Ollama.
 
-- **Docker** — [Docker Desktop](https://docs.docker.com/desktop/) (Windows/macOS) or [Docker Engine](https://docs.docker.com/engine/install/) (Linux)
+This repository is the **public release-distribution channel** for GENAPA. End users download installers from here; installed environments self-update from the Velopack feed published on each release.
 
-## Installer Downloads
+## Install
 
-Download the native installer for your platform from the [latest release](https://github.com/iamkelatar/genapa-releases/releases/latest). Each installer is the complete GENAPA package for that OS and can be run through the OS GUI or CLI.
+GENAPA installs through the **Package Manager**, a small bootstrap that then manages your Forge environments. Download the installer for your platform from the [latest release](https://github.com/iamkelatar/genapa-releases/releases/latest), then launch it.
 
-| Platform | Installer | Install Command |
-|----------|-----------|-----------------|
-| Windows  | `GENAPA.Installer.Windows.msi` | Open the MSI or `msiexec /i GENAPA.Installer.Windows.msi` |
-| Debian/Ubuntu | `genapa-forge_<version>_amd64.deb` | `sudo dpkg -i genapa-forge_<version>_amd64.deb` |
-| RHEL/Fedora | `genapa-forge-<version>.x86_64.rpm` | `sudo rpm -i genapa-forge-<version>.x86_64.rpm` |
-| macOS | `genapa-forge-<version>-universal.pkg` | Open the PKG or `sudo installer -pkg genapa-forge-<version>-universal.pkg -target /` |
+| Platform | Installer asset |
+|----------|-----------------|
+| Windows x64 | `GENAPA.PackageManager.Windows-<version>-Setup.exe` |
+| Linux x64 | `GENAPA.PackageManager.Linux-<version>.AppImage` |
+| macOS Apple Silicon | `GENAPA.PackageManager.macOS-arm64-<version>-Setup.pkg` |
+| macOS Intel | `GENAPA.PackageManager.macOS-x64-<version>-Setup.pkg` |
 
-## Notes
+### Windows
+Double-click the `.exe`. The Package Manager installs to `%LOCALAPPDATA%\GENAPA\` and registers a Start Menu entry. Launch **GENAPA Package Manager** from the Start Menu.
 
-- Each installer already contains the GENAPA payload. Installation does not require downloading additional GENAPA release assets.
-- Use the native installer surface for install and upgrade.
-- Offline Docker image tar assets remain available in each release for manual recovery and air-gapped staging.
-- Linux uses one installer contract under the OS package manager. Choose the `.deb` package for Debian/Ubuntu or the `.rpm` package for RHEL/Fedora-family systems.
-- Linux GUI install depends on your distro desktop. If no package UI is available, use the CLI command shown above.
-- macOS installs through Installer or `installer -pkg`. `pkgutil` tracks the package receipt, but service and data cleanup remain separate from receipt removal.
+### Linux
+```bash
+chmod +x GENAPA.PackageManager.Linux-<version>.AppImage
+./GENAPA.PackageManager.Linux-<version>.AppImage
+```
+
+The AppImage launches the GUI by default. For headless servers, pass CLI verbs directly to the AppImage.
+
+### macOS
+Double-click the `.pkg` and follow the Installer GUI, or run `sudo installer -pkg <file>.pkg -target /`. Open **GENAPA Package Manager** from Launchpad.
+
+## After Install
+
+Open the Package Manager and install a **Forge** environment from the GUI. Once Forge is installed and started, you get:
+
+- A local **Portal** (Blazor web UI) for file ingestion, watchers, environment management, and natural-language chat over your archive.
+- A local **Forge API** with semantic search, incremental file watchers, and an **MCP server** (Streamable HTTP, legacy SSE, and stdio) so AI assistants can read from and write to the archive directly.
+- **Agent sessions** that clone the workspace into isolated git worktrees, enabling safe parallel agent coding against the same archive.
+
+Updates apply automatically through Velopack — you do not re-download installers for routine updates.
+
+## Channels and the Asset List
+
+Each release publishes against a channel. As of today only the **alpha** channel is shipping; **beta**, **rc**, and **stable** are wired into CI and will appear here as they are cut.
+
+The release page lists more files than just the installers above. The additional assets are the **Velopack feed machinery** the installed Package Manager and Forge environments consume for self-update:
+
+- `*.nupkg` — full and delta update packages.
+- `RELEASES-*`, `releases.*.json`, `assets.*.json` — Velopack feed indexes.
+
+Channels emit as `win-x64-<channel>`, `linux-<channel>`, `osx-x64-<channel>`, `osx-arm64-<channel>`. Package Manager self-update channels carry the `-pm` suffix.
+
+## Notes for Alpha Builds
+
+Alpha builds may be unsigned or partially signed. Windows SmartScreen and macOS Gatekeeper may warn on first install — click **More info → Run anyway** on Windows, or right-click → **Open** on macOS, to approve once.
 
 ## Support
 
